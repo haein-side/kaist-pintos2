@@ -28,7 +28,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-
+/* Multi-level feedback queue */
 #define NICE_DEFAULT 0
 #define RECENT_CPU_DEFAULT 0
 #define LOAD_AVG_DEFAULT 0
@@ -92,27 +92,25 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 struct thread {
 	/* Owned by thread.c. */
-	tid_t tid;                          /* 쓰레드 ID (Thread identifier.) */
-	enum thread_status status;          /* 쓰레드 상태 (Thread state.) */
+	tid_t tid;                          /* Thread identifier. */
+	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int64_t wakeup_tick; 				/* 깨어나야 할 tick */
+	int64_t wakeup_tick;				/* 깨어나야 하는 ticks 값 */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
 	/* priority donation */
-	int init_priority; 					/* 우선순위를 donation 받을 때, 자신의 원래 우선 순위를 저장할 수 있는 필드 */
-	struct lock *wait_on_lock;			/* 현재 쓰레드가 필요한 lock을 들고 있는 쓰레드의 주소를 저장하는 필드 */
-	
-	/* multiple priority를 구조체 선언 */
-	struct list donations; 				/* 자신에게 priority를 donate한 쓰레드의 리스트 */
-	struct list_elem donation_elem;  	/* priority를 donate한 쓰레드들의 리스트를 관리하기 위한 element 
-										이 element를 통해 자신이 우선 순위를 donate한 쓰레드의 donates 리스트에 연결*/
+	int init_priority;					/* 우선순위 donate 받을 때 자신의 이전 상태 우선순위를 저장해놓는 변수 */
+	struct lock *wait_on_lock;			/* 해당 스레드가 우선순위 inversion 때문에 요청하고 반환받기를 기다리고 있는 lock 자료구조의 주소 */
+	struct list donations;				/* 자신에게 priority를 donate한 스레드의 리스트 */
+	struct list_elem donation_elem;		/* 내가 donate 줄 때 donations에 넣어주는 식별자(elem) */
 
+	/* Multi-level feedback queue */
 	int nice;
-	int recent_cpu;
-	
+  	int recent_cpu;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -161,27 +159,22 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
-void thread_sleep(int64_t ticks);				// 실행중인 쓰레드를 슬립으로 바꿈
-void thread_awake(int64_t ticks);				// sleep_list에서 깨워야할 쓰레드를 깨움
-void update_next_tick_to_awake(int64_t ticks); // 최소 tick을 가진 쓰레드 저장
-int64_t get_next_tick_to_awake(void);		   // thread.c의 next_tick_to_awake 반환
+/* 현재 수행중인 스레드와 가장 높은 우선순위의 스레드의 우선순위를 비교하여 스케줄링 */
+void test_max_priority (void);
 
-/* project1 : prority scheduling */
-void test_max_priority(void);
-bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+/* 인자로 주어진 스레드들의 우선순위를 비교 */
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
+void donate_priority(void); /* priority donation을 수행 */
+void remove_with_lock(struct lock *lock); /* donation list에서 스레드 엔트리를 제거 */
+void refresh_priority(void); /* 우선순위를 다시 계산 */
 
-/* project1 : priority donation */
-void donate_priority(void);
-void remove_with_lock(struct lock *lock); 
-void refresh_priority(void);
+/* Multi-level feedback queue */
+void mlfqs_priority (struct thread *t); /* 특정 스레드의 priority 를 계산 */
+void mlfqs_recent_cpu (struct thread *t); /* 인자로 주어진 스레드의 recent_cpu 값을 계산 */
+void mlfqs_load_avg (void); /* 시스템의 load_avg를 업데이트 */
+void mlfqs_increment_recent_cpu (void); /* 1 tick 마다 running 스레드의 recent_cpu 값 + 1 */
+void mlfqs_recalc_recent_cpu (void); /* 4 tick 마다 모든 스레드의 priority 재계산 */
+void mlfqs_recalc_priority (void); /* 1 초마다 모든 스레드의 recent_cpu 값과 load_avg 값 재계산 */
 
-
-/* advanced scheduling */
-void mlfqs_priority (struct thread *t);
-void mlfqs_recent_cpu (struct thread *t);
-void mlfqs_load_avg (void);
-void mlfqs_increment_recent_cpu (void);
-void mlfqs_recalc_recent_cpu (void);
-void mlfqs_recalc_priority (void);
 #endif /* threads/thread.h */

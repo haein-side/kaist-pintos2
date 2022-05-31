@@ -10,43 +10,50 @@ struct semaphore {
 	struct list waiters;        /* List of waiting threads. */
 };
 
-void sema_init (struct semaphore *, unsigned value); /* semaphore를 주어진 value로 초기화 */
-void sema_down (struct semaphore *); /* semaphore를 요청하고 획득했을 때 value를 1 낮춤 */
+// 세마포어를 주어진 value로 초기화
+void sema_init (struct semaphore *, unsigned value);
+// 세마포어를 요청하고 획득했을 때 value를 1 낮춤
+void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
-void sema_up (struct semaphore *); /* semaphore를 반환하고 value를 1 높임 */
+// 세마포어를 반환하고 value를 1 높임
+void sema_up (struct semaphore *);
 void sema_self_test (void);
 
 /* Lock. */
 struct lock {
-	struct thread *holder;      /* 지금 lock으로 제한되어 있는 공유자원을 사용하고 있는 스레드*/
+	struct thread *holder;      /* Thread holding lock (for debugging). */
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 };
 
-void lock_init (struct lock *); /* lock 자료구조를 초기화 */
-void lock_acquire (struct lock *); /* lock을 요청 */
+// lock 자료 구조를 초기화
+void lock_init (struct lock *);
+// lock을 요청
+void lock_acquire (struct lock *);
 bool lock_try_acquire (struct lock *);
-void lock_release (struct lock *); /* lock을 반환 */
+// lock을 반환
+void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
 
 /* Condition variable. */
 struct condition {
 	struct list waiters;        /* List of waiting threads. */
 };
-
-void cond_init (struct condition *); /* condition variable 자료구조를 초기화 */
-void cond_wait (struct condition *, struct lock *); /* condition variable을 통해 signal이 오는지 가림 */
-void cond_signal (struct condition *, struct lock *); /* condition variable에서 기다리는 가장 높은 우선순위의 스레드에 signal을 보냄 */
-void cond_broadcast (struct condition *, struct lock *); /* condition variable에서 기다리는 모든 스레드에 signal을 보냄 */
+/* condition variable 자료구조를 초기화 */
+void cond_init (struct condition *);
+/* condition variable을 통해 signal이 오는지 기다림 */
+void cond_wait (struct condition *, struct lock *);
+/* waiters list를 우선순위를 재정렬하고,  */
+/* condition variable에서 기다리는 가장 높은 우선순위의 쓰레드에 signal을 보냄 */
+void cond_signal (struct condition *, struct lock *);
+/* condition variable에서 기다리는 모든 쓰레드에 signal을 보냄 */
+void cond_broadcast (struct condition *, struct lock *);
 
 bool cmp_sem_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
-
-/* donation_elem  */
-bool thread_compare_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_donation_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 void donate_priority(void); 
 void remove_with_lock(struct lock *lock); 
 void refresh_priority(void);
-
 /* Optimization barrier.
  *
  * The compiler will not reorder operations across an
